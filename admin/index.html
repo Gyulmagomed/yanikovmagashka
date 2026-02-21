@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YANIKOV — Админ-панель</title>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #050505;
+      color: #fafafa;
+      margin: 0;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    .container { max-width: 600px; margin: 0 auto; }
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: 4px;
+      margin-bottom: 8px;
+    }
+    .subtitle { color: #a3a3a3; font-size: 14px; margin-bottom: 32px; }
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-size: 14px;
+      color: #a3a3a3;
+      margin-bottom: 8px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 14px 18px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      color: #fafafa;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #404040;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    button {
+      width: 100%;
+      padding: 16px;
+      background: #fff;
+      color: #050505;
+      border: none;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .sizes-hint { font-size: 12px; color: #666; margin-top: -12px; margin-bottom: 20px; }
+    .msg {
+      padding: 12px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .msg.success { background: #1a3d1a; color: #4ade80; display: block; }
+    .msg.error { background: #3d1a1a; color: #f87171; display: block; }
+    .config-note {
+      background: #1a1a2a;
+      border: 1px solid #2a2a4a;
+      border-radius: 12px;
+      padding: 16px;
+      font-size: 13px;
+      color: #a3a3a3;
+      margin-bottom: 24px;
+    }
+    .config-note code { color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>YANIKOV</h1>
+    <p class="subtitle">Админ-панель — добавление товаров</p>
+
+    <div class="config-note">
+      <strong>Настройка Firebase:</strong> Откройте <code>admin/config.js</code> и вставьте данные из Firebase Console → Настройки проекта → Ваши приложения → Web app.
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <div class="card">
+      <form id="productForm">
+        <label>Название товара *</label>
+        <input type="text" id="title" required placeholder="Куртка Oversize">
+
+        <label>Цена (руб) *</label>
+        <input type="number" id="price" required min="0" step="1" placeholder="12990">
+
+        <label>Категория *</label>
+        <select id="category" required>
+          <option value="Одежда">Одежда</option>
+          <option value="Обувь">Обувь</option>
+          <option value="Аксессуары">Аксессуары</option>
+          <option value="Новая коллекция">Новая коллекция</option>
+        </select>
+
+        <label>Описание</label>
+        <textarea id="description" placeholder="Описание товара..."></textarea>
+
+        <label>Размеры</label>
+        <input type="text" id="sizes" placeholder="S, M, L, XL или 39, 40, 41, 42">
+        <p class="sizes-hint">Через запятую. Оставьте пустым, если размеров нет.</p>
+
+        <label>Фото товара *</label>
+        <input type="file" id="photo" accept="image/*" required>
+
+        <button type="submit" id="submitBtn">Добавить товар</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script>
+    let db, storage;
+
+    function initFirebase() {
+      if (typeof firebaseConfig === 'undefined' || !firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY') {
+        showMsg('Настройте config.js с данными Firebase', true);
+        return false;
+      }
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+      storage = firebase.storage();
+      return true;
+    }
+
+    function showMsg(text, isError) {
+      const el = document.getElementById('msg');
+      el.textContent = text;
+      el.className = 'msg ' + (isError ? 'error' : 'success');
+    }
+
+    function formatPrice(val) {
+      const s = String(val);
+      let r = '';
+      for (let i = 0; i < s.length; i++) {
+        if (i > 0 && (s.length - i) % 3 === 0) r += ' ';
+        r += s[i];
+      }
+      return r + ' ₽';
+    }
+
+    document.getElementById('productForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!db) {
+        showMsg('Firebase не инициализирован', true);
+        return;
+      }
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      try {
+        const title = document.getElementById('title').value.trim();
+        const price = parseInt(document.getElementById('price').value, 10) || 0;
+        const category = document.getElementById('category').value;
+        const description = document.getElementById('description').value.trim() || null;
+        const sizesStr = document.getElementById('sizes').value.trim();
+        const sizes = sizesStr ? sizesStr.split(',').map(s => s.trim()).filter(Boolean) : null;
+        const fileInput = document.getElementById('photo');
+
+        if (!fileInput.files.length) {
+          showMsg('Выберите фото', true);
+          btn.disabled = false;
+          return;
+        }
+
+        const file = fileInput.files[0];
+        const ext = file.name.split('.').pop() || 'jpg';
+        const path = 'products/' + Date.now() + '.' + ext;
+
+        const ref = storage.ref(path);
+        await ref.put(file);
+        const imageUrl = await ref.getDownloadURL();
+
+        await db.collection('products').add({
+          title,
+          price,
+          category,
+          description,
+          sizes,
+          imageUrl,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+
+        showMsg('Товар добавлен! Он появится в приложении.');
+        document.getElementById('productForm').reset();
+      } catch (err) {
+        showMsg('Ошибка: ' + err.message, true);
+      }
+      btn.disabled = false;
+    });
+
+    if (initFirebase()) {
+      showMsg('Готово. Добавьте товар.', false);
+    }
+  </script>
+</body>
+</html>

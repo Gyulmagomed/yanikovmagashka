@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YANIKOV — Админка (Supabase)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #050505 0%, #070708 25%, #08090a 50%, #0a0b0c 75%, #0c0d0e 100%);
+      color: #fafafa;
+      margin: 0;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 24px; font-weight: 600; letter-spacing: 4px; margin-bottom: 8px; }
+    .subtitle { color: #a3a3a3; font-size: 14px; margin-bottom: 32px; }
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    label { display: block; font-size: 14px; color: #a3a3a3; margin-bottom: 8px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 14px 18px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      color: #fafafa;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    button {
+      padding: 16px;
+      background: #fff;
+      color: #050505;
+      border: none;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-full { width: 100%; }
+    .btn-danger {
+      background: #dc2626;
+      color: #fff;
+      padding: 10px 18px;
+      font-size: 14px;
+    }
+    .btn-danger:hover { background: #b91c1c; }
+    .sizes-hint { font-size: 12px; color: #666; margin-top: -12px; margin-bottom: 20px; }
+    .msg { padding: 12px; border-radius: 12px; margin-bottom: 20px; display: none; }
+    .msg.success { background: #1a3d1a; color: #4ade80; display: block; }
+    .msg.error { background: #3d1a1a; color: #f87171; display: block; }
+    .config-note {
+      background: #1a1a2a;
+      border: 1px solid #2a2a4a;
+      border-radius: 12px;
+      padding: 16px;
+      font-size: 13px;
+      color: #a3a3a3;
+      margin-bottom: 24px;
+    }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .tab {
+      padding: 12px 20px;
+      background: transparent;
+      color: #a3a3a3;
+      border: none;
+      border-radius: 12px 12px 0 0;
+      cursor: pointer;
+      font-size: 15px;
+    }
+    .tab:hover { color: #fafafa; }
+    .tab.active { background: #1a1a1a; color: #fff; border: 1px solid #2a2a2a; border-bottom-color: #1a1a1a; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .product-list { display: flex; flex-direction: column; gap: 16px; }
+    .product-card {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .product-card img {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 10px;
+    }
+    .product-card .info { flex: 1; min-width: 0; }
+    .product-card .title { font-weight: 600; margin-bottom: 4px; }
+    .product-card .meta { font-size: 13px; color: #a3a3a3; }
+    .product-card .actions { display: flex; gap: 8px; align-items: center; }
+    .filter-row { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+    .filter-row .search-input {
+      flex: 1;
+      min-width: 200px;
+      margin-bottom: 0;
+    }
+    .filter-row select {
+      width: auto;
+      min-width: 180px;
+      margin-bottom: 0;
+    }
+    .filter-row .count { color: #a3a3a3; font-size: 14px; }
+    .loading, .empty { text-align: center; padding: 40px; color: #a3a3a3; }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+    .modal {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 400px;
+      width: 100%;
+    }
+    .modal h3 { margin: 0 0 12px 0; }
+    .modal p { color: #a3a3a3; margin-bottom: 20px; }
+    .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
+    .modal-buttons button { width: auto; }
+    .sql-block {
+      background: #0a0a0a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+      font-family: monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      margin-bottom: 16px;
+      color: #e5e5e5;
+    }
+    .stats-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 14px;
+      padding: 20px;
+      flex: 1;
+      min-width: 140px;
+    }
+    .stat-card .value { font-size: 28px; font-weight: 700; color: #fff; }
+    .stat-card .label { font-size: 13px; color: #a3a3a3; margin-top: 4px; }
+    .btn-edit {
+      background: #404040;
+      color: #fff;
+      padding: 10px 18px;
+      font-size: 14px;
+    }
+    .btn-edit:hover { background: #525252; }
+    .photo-preview {
+      width: 120px;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 1px solid #2a2a2a;
+      margin-bottom: 12px;
+    }
+    .edit-modal .form-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+    .edit-modal .form-row .photo-col { flex-shrink: 0; }
+    .sort-row { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .sort-row select { width: auto; min-width: 160px; margin-bottom: 0; }
+    .sort-row .view-toggle { display: flex; gap: 4px; }
+    .sort-row .view-toggle button {
+      padding: 10px 14px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      color: #a3a3a3;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .sort-row .view-toggle button.active { background: #2a2a2a; color: #fff; }
+    .sort-row .view-toggle button:hover { color: #fff; }
+    .last-update { font-size: 12px; color: #666; }
+    .btn-sm {
+      padding: 8px 14px;
+      font-size: 13px;
+      background: #2a2a2a;
+      color: #fff;
+    }
+    .btn-sm:hover { background: #404040; }
+    .product-list.grid-view {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .product-list.grid-view .product-card {
+      flex-direction: column;
+      align-items: stretch;
+      text-align: center;
+    }
+    .product-list.grid-view .product-card img {
+      width: 100%;
+      height: 160px;
+    }
+    .product-list.grid-view .product-card .info { order: 2; }
+    .product-list.grid-view .product-card .actions {
+      flex-direction: column;
+      order: 3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>YANIKOV</h1>
+    <p class="subtitle">Админка — Supabase</p>
+
+    <div class="config-note">
+      Настройте <code>config.js</code> — вставьте URL и anon key из Supabase Dashboard.
+    </div>
+
+    <div id="promoBanner" class="card" style="margin-bottom:20px; padding:16px 24px; align-items:center; gap:16px; display:none;">
+      <span style="font-size:28px;">🛍</span>
+      <div>
+        <strong style="font-size:15px;">Промокоды</strong>
+        <div id="promoBannerText" style="font-size:13px; color:#a3a3a3;">Создайте промокоды во вкладке «Промокоды»</div>
+      </div>
+    </div>
+
+    <div id="loginOverlay" class="modal-overlay" style="display: none;">
+      <div class="modal">
+        <h3>Вход в админку</h3>
+        <p style="color:#a3a3a3; margin-bottom:16px;">Введите пароль администратора</p>
+        <input type="password" id="loginPassword" placeholder="Пароль">
+        <button type="button" id="loginBtn" class="btn-full">Войти</button>
+      </div>
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <div id="mainContent" class="">
+    <div class="tabs">
+      <button class="tab active" data-tab="add">Добавить товар</button>
+      <button class="tab" data-tab="list">Все товары</button>
+      <button class="tab" data-tab="promo">Промокоды</button>
+      <button class="tab" data-tab="setup">Настройка</button>
+    </div>
+
+    <div id="tab-add" class="tab-content active">
+      <div class="card" style="margin-bottom:16px; padding:16px;">
+        <div style="font-size:13px; color:#a3a3a3; margin-bottom:8px;">Быстрые шаблоны</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="btn-sm" data-template="clothing">Одежда</button>
+          <button type="button" class="btn-sm" data-template="shoes">Обувь</button>
+          <button type="button" class="btn-sm" data-template="accessory">Аксессуар</button>
+        </div>
+      </div>
+      <div class="card">
+        <form id="productForm">
+          <label>Название товара *</label>
+          <input type="text" id="title" required placeholder="Куртка Oversize">
+
+          <label>Цена (руб) *</label>
+          <input type="number" id="price" required min="0" step="1" placeholder="12990">
+
+          <label>Категория *</label>
+          <select id="category" required>
+            <option value="Одежда">Одежда</option>
+            <option value="Обувь">Обувь</option>
+            <option value="Аксессуары">Аксессуары</option>
+            <option value="Новая коллекция">Новая коллекция</option>
+          </select>
+
+          <label>Описание</label>
+          <textarea id="description" placeholder="Описание товара..."></textarea>
+
+          <div id="sizesWrap">
+            <label>Размеры</label>
+            <input type="text" id="sizes" placeholder="S, M, L, XL или 39, 40, 41, 42">
+            <p class="sizes-hint">Через запятую. Только для одежды и обуви.</p>
+          </div>
+
+          <label>Фото товара *</label>
+          <div id="photoPreviewWrap" style="display:none;"><img id="photoPreview" class="photo-preview" alt="Превью"></div>
+          <input type="file" id="photo" accept="image/*" required>
+
+          <button type="submit" id="submitBtn" class="btn-full">Добавить товар</button>
+
+          <div style="margin-top:24px; padding-top:24px; border-top:1px solid #2a2a2a;">
+            <p style="color:#a3a3a3; margin-bottom:12px; font-size:14px;"><strong>С вашими картинками</strong> — в папке admin_supabase выполните:</p>
+            <pre class="sql-block" style="margin-bottom:12px;">npm run seed</pre>
+            <p style="color:#a3a3a3; font-size:13px;">Загрузит все 40 товаров с фото из assets/products/ в Supabase.</p>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="tab-list" class="tab-content">
+      <div class="stats-row" id="statsRow">
+        <div class="stat-card"><span class="value" id="statTotal">0</span><div class="label">Всего товаров</div></div>
+        <div class="stat-card"><span class="value" id="statClothing">0</span><div class="label">Одежда</div></div>
+        <div class="stat-card"><span class="value" id="statShoes">0</span><div class="label">Обувь</div></div>
+        <div class="stat-card"><span class="value" id="statAcc">0</span><div class="label">Аксессуары</div></div>
+        <div class="stat-card"><span class="value" id="statNew">0</span><div class="label">Новая коллекция</div></div>
+      </div>
+      <div class="sort-row">
+        <select id="sortBy">
+          <option value="date-desc">Сначала новые</option>
+          <option value="date-asc">Сначала старые</option>
+          <option value="price-desc">Цена: по убыванию</option>
+          <option value="price-asc">Цена: по возрастанию</option>
+          <option value="name-asc">Название: А–Я</option>
+          <option value="name-desc">Название: Я–А</option>
+        </select>
+        <div class="view-toggle">
+          <button type="button" id="viewList" class="active" title="Список">☰</button>
+          <button type="button" id="viewGrid" title="Сетка">⊞</button>
+        </div>
+        <span class="last-update" id="lastUpdate"></span>
+      </div>
+      <div class="filter-row">
+        <input type="text" id="searchInput" placeholder="Поиск по названию..." class="search-input">
+        <select id="filterCategory">
+          <option value="">Все категории</option>
+          <option value="Одежда">Одежда</option>
+          <option value="Обувь">Обувь</option>
+          <option value="Аксессуары">Аксессуары</option>
+          <option value="Новая коллекция">Новая коллекция</option>
+        </select>
+        <button type="button" id="refreshBtn">Обновить</button>
+        <button type="button" id="exportBtn" class="btn-sm" style="padding:10px 16px;" title="Скачать список">📥 Экспорт</button>
+        <span class="count" id="productCount"></span>
+      </div>
+      <div id="productList" class="product-list"></div>
+    </div>
+
+    <div id="tab-promo" class="tab-content">
+      <div class="card">
+        <h3 style="margin:0 0 16px 0; font-size:18px;">Создание промокодов</h3>
+        <p style="color:#a3a3a3; margin-bottom:20px; font-size:14px;">Только вы можете создавать промокоды. Настройте adminSecret в config.js и выполните promo_codes_setup.sql в Supabase.</p>
+        <form id="promoForm">
+          <label>Код промокода *</label>
+          <input type="text" id="promoCode" required placeholder="WELCOME" style="text-transform:uppercase;">
+          <label>Скидка (%) *</label>
+          <input type="number" id="promoDiscount" required min="1" max="100" placeholder="10">
+          <button type="submit" id="addPromoBtn" class="btn-full">Добавить промокод</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 16px 0; font-size:16px;">Активные промокоды</h3>
+        <div id="promoList" class="product-list"></div>
+      </div>
+    </div>
+
+    <div id="tab-setup" class="tab-content">
+      <div class="card">
+        <h3 style="margin:0 0 12px 0; font-size:16px;">Если удаление или редактирование не работает</h3>
+        <p style="color:#a3a3a3; margin-bottom:16px; font-size:14px;">В Supabase → SQL Editor выполните:</p>
+        <pre class="sql-block">-- Политика удаления
+create policy "Разрешить удаление всем"
+  on products for delete using (true);
+
+-- Политика редактирования
+create policy "Разрешить обновление всем"
+  on products for update using (true)
+  with check (true);</pre>
+        <p style="color:#a3a3a3; font-size:14px;">Или в папке <code>admin_supabase</code> выполните <code>npm run setup</code>.</p>
+        <h3 style="margin:24px 0 12px 0; font-size:16px;">Промокоды (только вы создаёте)</h3>
+        <p style="color:#a3a3a3; margin-bottom:16px; font-size:14px;">Выполните <code>promo_codes_setup.sql</code>, затем добавьте в config.js: adminSecret и adminPassword.</p>
+        <h3 style="margin:24px 0 12px 0; font-size:16px;">Ссылки</h3>
+        <p style="margin-bottom:12px;">
+          <a href="https://supabase.com/dashboard" target="_blank" rel="noopener" style="color:#60a5fa; text-decoration:none;">Supabase Dashboard</a> ·
+          <a href="#" id="projectLink" target="_blank" rel="noopener" style="color:#60a5fa; text-decoration:none;">Ваш проект</a>
+        </p>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <div id="deleteModal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <h3>Удалить товар?</h3>
+      <p id="deleteProductName">Товар будет удалён из базы и исчезнет в приложении.</p>
+      <div class="modal-buttons">
+        <button type="button" id="cancelDelete">Отмена</button>
+        <button type="button" id="confirmDelete" class="btn-danger">Удалить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="editModal" class="modal-overlay" style="display: none;">
+    <div class="modal edit-modal" style="max-width: 520px;">
+      <h3>Редактировать товар</h3>
+      <form id="editForm">
+        <input type="hidden" id="editId">
+        <div class="form-row">
+          <div class="photo-col">
+            <img id="editPhotoPreview" class="photo-preview" src="" alt="" style="width:100px;height:100px;">
+          </div>
+          <div style="flex:1;min-width:0;">
+            <label>Название *</label>
+            <input type="text" id="editTitle" required>
+            <label>Цена (руб) *</label>
+            <input type="number" id="editPrice" required min="0">
+            <label>Категория *</label>
+            <select id="editCategory" required>
+              <option value="Одежда">Одежда</option>
+              <option value="Обувь">Обувь</option>
+              <option value="Аксессуары">Аксессуары</option>
+              <option value="Новая коллекция">Новая коллекция</option>
+            </select>
+          </div>
+        </div>
+        <label>Описание</label>
+        <textarea id="editDescription" style="min-height:60px;"></textarea>
+        <div id="editSizesWrap">
+          <label>Размеры</label>
+          <input type="text" id="editSizes" placeholder="S, M, L, XL">
+        </div>
+        <label>Новое фото (оставьте пустым, чтобы не менять)</label>
+        <input type="file" id="editPhoto" accept="image/*">
+        <div class="modal-buttons" style="margin-top:20px;">
+          <button type="button" id="cancelEdit">Отмена</button>
+          <button type="submit" id="saveEditBtn">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script>
+    let supabaseClient;
+    let products = [];
+    let deleteTarget = null;
+    let viewMode = 'list';
+    let lastLoadTime = null;
+
+    function init() {
+      if (typeof supabaseConfig === 'undefined' || !supabaseConfig.url || supabaseConfig.url.includes('YOUR_')) {
+        showMsg('Настройте config.js с данными Supabase', true);
+        return false;
+      }
+      const { createClient } = window.supabase;
+      supabaseClient = createClient(supabaseConfig.url, supabaseConfig.anonKey);
+      return true;
+    }
+
+    function showMsg(text, isError) {
+      const el = document.getElementById('msg');
+      el.textContent = text;
+      el.className = 'msg ' + (isError ? 'error' : 'success');
+    }
+
+    document.querySelectorAll('.tab').forEach(t => {
+      t.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        document.getElementById('tab-' + t.dataset.tab).classList.add('active');
+        if (t.dataset.tab === 'list') loadProducts();
+        if (t.dataset.tab === 'promo') loadPromoCodes();
+      });
+    });
+
+    function checkAuth() {
+      const pwd = (typeof adminPassword !== 'undefined' ? adminPassword : '');
+      if (!pwd) {
+        document.getElementById('mainContent').style.display = 'block';
+        return true;
+      }
+      if (sessionStorage.getItem('yanikov_admin') === pwd) {
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('mainContent').style.display = 'block';
+        return true;
+      }
+      document.getElementById('loginOverlay').style.display = 'flex';
+      document.getElementById('mainContent').style.display = 'none';
+      return false;
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', () => {
+      const input = document.getElementById('loginPassword');
+      const pwd = (typeof adminPassword !== 'undefined' ? adminPassword : '');
+      if (input.value === pwd) {
+        sessionStorage.setItem('yanikov_admin', pwd);
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('mainContent').style.display = 'block';
+        input.value = '';
+      } else {
+        showMsg('Неверный пароль', true);
+      }
+    });
+
+    document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('loginBtn').click();
+    });
+
+    document.querySelectorAll('[data-template]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const t = btn.dataset.template;
+        const templates = {
+          clothing: { title: 'Новый товар', price: '5990', category: 'Одежда', description: 'Описание товара', sizes: 'S, M, L, XL' },
+          shoes: { title: 'Обувь', price: '9990', category: 'Обувь', description: '', sizes: '39, 40, 41, 42, 43' },
+          accessory: { title: 'Аксессуар', price: '2990', category: 'Аксессуары', description: '', sizes: '' }
+        };
+        const d = templates[t] || templates.clothing;
+        document.getElementById('title').value = d.title;
+        document.getElementById('price').value = d.price;
+        document.getElementById('category').value = d.category;
+        document.getElementById('description').value = d.description;
+        document.getElementById('sizes').value = d.sizes;
+        toggleSizesByCategory();
+        showMsg('Шаблон заполнен. Добавьте фото и нажмите «Добавить товар».');
+      });
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const data = JSON.stringify(products, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'yanikov-products-' + new Date().toISOString().slice(0,10) + '.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showMsg('Список товаров скачан.');
+    });
+
+    function toggleSizesByCategory() {
+      const cat = document.getElementById('category').value;
+      const wrap = document.getElementById('sizesWrap');
+      wrap.style.display = (cat === 'Аксессуары') ? 'none' : 'block';
+      if (cat === 'Аксессуары') document.getElementById('sizes').value = '';
+    }
+
+    function toggleEditSizesByCategory() {
+      const cat = document.getElementById('editCategory').value;
+      const wrap = document.getElementById('editSizesWrap');
+      wrap.style.display = (cat === 'Аксессуары') ? 'none' : 'block';
+      if (cat === 'Аксессуары') document.getElementById('editSizes').value = '';
+    }
+
+    document.getElementById('category').addEventListener('change', toggleSizesByCategory);
+    document.getElementById('editCategory').addEventListener('change', toggleEditSizesByCategory);
+
+    document.getElementById('productForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!supabaseClient) {
+        showMsg('Supabase не инициализирован', true);
+        return;
+      }
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      try {
+        const title = document.getElementById('title').value.trim();
+        const price = parseInt(document.getElementById('price').value, 10) || 0;
+        const category = document.getElementById('category').value;
+        const description = document.getElementById('description').value.trim() || null;
+        const cat = document.getElementById('category').value;
+        const sizesStr = (cat === 'Аксессуары') ? '' : document.getElementById('sizes').value.trim();
+        const sizes = sizesStr ? sizesStr.split(',').map(s => s.trim()).filter(Boolean) : null;
+        const fileInput = document.getElementById('photo');
+
+        if (!fileInput.files.length) {
+          showMsg('Выберите фото', true);
+          btn.disabled = false;
+          return;
+        }
+
+        const file = fileInput.files[0];
+        const ext = file.name.split('.').pop() || 'jpg';
+        const path = 'products/' + Date.now() + '.' + ext;
+
+        const { error: uploadErr } = await supabaseClient.storage.from('products').upload(path, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+        if (uploadErr) throw uploadErr;
+
+        const { data: urlData } = supabaseClient.storage.from('products').getPublicUrl(path);
+        const imageUrl = urlData.publicUrl;
+
+        const { error: insertErr } = await supabaseClient.from('products').insert({
+          title,
+          price,
+          category,
+          description,
+          sizes,
+          image_url: imageUrl,
+          created_at: new Date().toISOString()
+        });
+
+        if (insertErr) throw insertErr;
+
+        showMsg('Товар добавлен! Он появится в приложении. Обновите список.');
+        document.getElementById('productForm').reset();
+        loadProducts();
+      } catch (err) {
+        showMsg('Ошибка: ' + (err.message || err), true);
+      }
+      btn.disabled = false;
+    });
+
+    async function loadProducts() {
+      const listEl = document.getElementById('productList');
+      const countEl = document.getElementById('productCount');
+      listEl.innerHTML = '<div class="loading">Загрузка...</div>';
+      if (!supabaseClient) {
+        listEl.innerHTML = '<div class="empty">Supabase не настроен</div>';
+        return;
+      }
+      try {
+        const { data, error } = await supabaseClient.from('products').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        products = data || [];
+        lastLoadTime = Date.now();
+        renderProducts();
+      } catch (err) {
+        listEl.innerHTML = '<div class="empty">Ошибка: ' + (err.message || err) + '</div>';
+        countEl.textContent = '';
+      }
+    }
+
+    function updateStats() {
+      document.getElementById('statTotal').textContent = products.length;
+      document.getElementById('statClothing').textContent = products.filter(p => p.category === 'Одежда').length;
+      document.getElementById('statShoes').textContent = products.filter(p => p.category === 'Обувь').length;
+      document.getElementById('statAcc').textContent = products.filter(p => p.category === 'Аксессуары').length;
+      document.getElementById('statNew').textContent = products.filter(p => p.category === 'Новая коллекция').length;
+    }
+
+    function applySort(arr) {
+      const sortBy = document.getElementById('sortBy').value;
+      const a = [...arr];
+      if (sortBy === 'date-desc') a.sort((x,y) => new Date(y.created_at||0) - new Date(x.created_at||0));
+      else if (sortBy === 'date-asc') a.sort((x,y) => new Date(x.created_at||0) - new Date(y.created_at||0));
+      else if (sortBy === 'price-desc') a.sort((x,y) => (y.price||0) - (x.price||0));
+      else if (sortBy === 'price-asc') a.sort((x,y) => (x.price||0) - (y.price||0));
+      else if (sortBy === 'name-asc') a.sort((x,y) => (x.title||'').localeCompare(y.title||''));
+      else if (sortBy === 'name-desc') a.sort((x,y) => (y.title||'').localeCompare(x.title||''));
+      return a;
+    }
+
+    function updateLastUpdate() {
+      const el = document.getElementById('lastUpdate');
+      if (!lastLoadTime) { el.textContent = ''; return; }
+      const sec = Math.floor((Date.now() - lastLoadTime) / 1000);
+      if (sec < 60) el.textContent = 'Обновлено только что';
+      else if (sec < 3600) el.textContent = 'Обновлено ' + Math.floor(sec/60) + ' мин. назад';
+      else el.textContent = 'Обновлено ' + Math.floor(sec/3600) + ' ч. назад';
+    }
+
+    function renderProducts() {
+      const listEl = document.getElementById('productList');
+      const countEl = document.getElementById('productCount');
+      const search = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+      const category = document.getElementById('filterCategory').value;
+      let filtered = products;
+      if (category) filtered = filtered.filter(p => p.category === category);
+      if (search) filtered = filtered.filter(p => (p.title || '').toLowerCase().includes(search));
+      filtered = applySort(filtered);
+      listEl.classList.toggle('grid-view', viewMode === 'grid');
+      updateStats();
+      updateLastUpdate();
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div class="empty">' + (products.length === 0 ? 'Нет товаров. Добавьте первый во вкладке «Добавить товар».' : 'Ничего не найдено. Попробуйте другой запрос.') + '</div>';
+        countEl.textContent = '0 из ' + products.length;
+        return;
+      }
+      countEl.textContent = filtered.length + (filtered.length === products.length ? '' : ' из ' + products.length) + ' товаров';
+      listEl.innerHTML = filtered.map(p => `
+        <div class="product-card" data-id="${p.id}">
+          <img src="${p.image_url || ''}" alt="${(p.title || '').replace(/"/g, '&quot;')}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22><rect fill=%22%23333%22 width=%2280%22 height=%2280%22/><text x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2212%22>Нет фото</text></svg>'">
+          <div class="info">
+            <div class="title">${(p.title || '').replace(/</g, '&lt;')}</div>
+            <div class="meta">${p.price || 0} ₽ · ${(p.category || '').replace(/</g, '&lt;')}</div>
+          </div>
+          <div class="actions">
+            ${p.image_url ? `<a href="${(p.image_url+'').replace(/"/g,'&quot;')}" target="_blank" rel="noopener" class="btn-sm" style="text-decoration:none;display:inline-block;" title="Открыть фото">🖼</a>` : ''}
+            <button type="button" class="btn-sm btn-duplicate" data-id="${p.id}" title="Дублировать">📋</button>
+            <button type="button" class="btn-edit" data-id="${p.id}">Изменить</button>
+            <button type="button" class="btn-danger" data-id="${p.id}">Удалить</button>
+          </div>
+        </div>
+      `).join('');
+      listEl.querySelectorAll('.btn-danger[data-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const prod = products.find(x => x.id === btn.dataset.id);
+          if (!prod) return;
+          deleteTarget = prod;
+          document.getElementById('deleteProductName').textContent = '«' + (prod.title || '') + '» будет удалён из базы и исчезнет в приложении.';
+          document.getElementById('deleteModal').style.display = 'flex';
+        });
+      });
+      listEl.querySelectorAll('.btn-edit[data-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const prod = products.find(x => x.id === btn.dataset.id);
+          if (!prod) return;
+          openEditModal(prod);
+        });
+      });
+      listEl.querySelectorAll('.btn-duplicate[data-id]').forEach(btn => {
+        btn.addEventListener('click', () => duplicateProduct(btn.dataset.id));
+      });
+    }
+
+    async function duplicateProduct(id) {
+      const prod = products.find(p => p.id === id);
+      if (!prod || !supabaseClient) return;
+      try {
+        const { error } = await supabaseClient.from('products').insert({
+          title: (prod.title || '') + ' (копия)',
+          price: prod.price || 0,
+          category: prod.category || 'Одежда',
+          description: prod.description,
+          sizes: prod.sizes || null,
+          image_url: prod.image_url,
+          created_at: new Date().toISOString()
+        });
+        if (error) throw error;
+        showMsg('Товар скопирован.');
+        loadProducts();
+      } catch (err) {
+        showMsg('Ошибка: ' + (err.message || err), true);
+      }
+    }
+
+    function openEditModal(prod) {
+      document.getElementById('editId').value = prod.id;
+      document.getElementById('editTitle').value = prod.title || '';
+      document.getElementById('editPrice').value = prod.price || 0;
+      document.getElementById('editCategory').value = prod.category || 'Одежда';
+      document.getElementById('editDescription').value = prod.description || '';
+      document.getElementById('editSizes').value = (prod.sizes || []).join(', ');
+      document.getElementById('editPhoto').value = '';
+      const prev = document.getElementById('editPhotoPreview');
+      prev.src = prod.image_url || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23333" width="100" height="100"/><text x="50%" y="50%" fill="%23666" text-anchor="middle" dy=".3em" font-size="12">Нет фото</text></svg>';
+      prev.style.display = 'block';
+      toggleEditSizesByCategory();
+      document.getElementById('editModal').style.display = 'flex';
+    }
+
+    document.getElementById('cancelEdit').addEventListener('click', () => {
+      document.getElementById('editModal').style.display = 'none';
+    });
+
+    document.getElementById('editForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!supabaseClient) return;
+      const btn = document.getElementById('saveEditBtn');
+      btn.disabled = true;
+      try {
+        const id = document.getElementById('editId').value;
+        const title = document.getElementById('editTitle').value.trim();
+        const price = parseInt(document.getElementById('editPrice').value, 10) || 0;
+        const category = document.getElementById('editCategory').value;
+        const description = document.getElementById('editDescription').value.trim() || null;
+        const editCat = document.getElementById('editCategory').value;
+        const sizesStr = (editCat === 'Аксессуары') ? '' : document.getElementById('editSizes').value.trim();
+        const sizes = sizesStr ? sizesStr.split(',').map(s => s.trim()).filter(Boolean) : null;
+        const fileInput = document.getElementById('editPhoto');
+        let imageUrl = products.find(p => p.id === id)?.image_url;
+
+        if (fileInput.files.length) {
+          const prod = products.find(p => p.id === id);
+          const path = getStoragePathFromUrl(prod?.image_url);
+          if (path) await supabaseClient.storage.from('products').remove([path]).catch(() => {});
+          const file = fileInput.files[0];
+          const ext = file.name.split('.').pop() || 'jpg';
+          const newPath = 'products/' + Date.now() + '.' + ext;
+          const { error: uploadErr } = await supabaseClient.storage.from('products').upload(newPath, file, { upsert: false });
+          if (uploadErr) throw uploadErr;
+          const { data: urlData } = supabaseClient.storage.from('products').getPublicUrl(newPath);
+          imageUrl = urlData.publicUrl;
+        }
+
+        const { error } = await supabaseClient.from('products').update({
+          title, price, category, description, sizes, image_url: imageUrl
+        }).eq('id', id);
+
+        if (error) throw error;
+        showMsg('Товар обновлён.');
+        document.getElementById('editModal').style.display = 'none';
+        loadProducts();
+      } catch (err) {
+        showMsg('Ошибка: ' + (err.message || err), true);
+      }
+      btn.disabled = false;
+    });
+
+    document.getElementById('photo').addEventListener('change', function() {
+      const wrap = document.getElementById('photoPreviewWrap');
+      const img = document.getElementById('photoPreview');
+      if (this.files && this.files[0]) {
+        const r = new FileReader();
+        r.onload = () => { img.src = r.result; wrap.style.display = 'block'; };
+        r.readAsDataURL(this.files[0]);
+      } else {
+        wrap.style.display = 'none';
+      }
+    });
+
+    function getStoragePathFromUrl(url) {
+      if (!url) return null;
+      const match = url.match(/\/products\/(.+)$/);
+      return match ? match[1] : null;
+    }
+
+    document.getElementById('cancelDelete').addEventListener('click', () => {
+      document.getElementById('deleteModal').style.display = 'none';
+      deleteTarget = null;
+    });
+
+    document.getElementById('confirmDelete').addEventListener('click', async () => {
+      if (!deleteTarget || !supabaseClient) return;
+      const modal = document.getElementById('deleteModal');
+      modal.style.display = 'none';
+      const target = deleteTarget;
+      deleteTarget = null;
+      try {
+        const { error: delErr } = await supabaseClient.from('products').delete().eq('id', target.id);
+        if (delErr) throw delErr;
+        const path = getStoragePathFromUrl(target.image_url);
+        if (path) {
+          await supabaseClient.storage.from('products').remove([path]).catch(() => {});
+        }
+        showMsg('Товар удалён. В приложении он исчезнет после обновления каталога.');
+        loadProducts();
+      } catch (err) {
+        showMsg('Ошибка: ' + (err.message || err) + ' — в папке admin_supabase выполните: npm run setup', true);
+      }
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', () => loadProducts());
+    document.getElementById('filterCategory').addEventListener('change', () => renderProducts());
+    document.getElementById('searchInput').addEventListener('input', () => renderProducts());
+    document.getElementById('sortBy').addEventListener('change', () => renderProducts());
+    document.getElementById('viewList').addEventListener('click', () => { viewMode = 'list'; document.getElementById('viewList').classList.add('active'); document.getElementById('viewGrid').classList.remove('active'); renderProducts(); });
+    document.getElementById('viewGrid').addEventListener('click', () => { viewMode = 'grid'; document.getElementById('viewGrid').classList.add('active'); document.getElementById('viewList').classList.remove('active'); renderProducts(); });
+    setInterval(updateLastUpdate, 60000);
+
+    let promoCodes = [];
+
+    async function loadPromoCodes() {
+      const listEl = document.getElementById('promoList');
+      const bannerEl = document.getElementById('promoBanner');
+      const bannerText = document.getElementById('promoBannerText');
+      if (!supabaseClient) {
+        listEl.innerHTML = '<div class="empty">Supabase не настроен</div>';
+        return;
+      }
+      try {
+        const { data, error } = await supabaseClient.from('promo_codes').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        promoCodes = data || [];
+        const active = promoCodes.filter(p => p.is_active);
+        if (active.length > 0) {
+          bannerEl.style.display = 'flex';
+          bannerText.textContent = active.map(p => p.code + ' (−' + p.discount_percent + '%)').join(', ') + ' — укажите в приложении';
+        } else {
+          bannerEl.style.display = 'none';
+        }
+        if (promoCodes.length === 0) {
+          listEl.innerHTML = '<div class="empty">Нет промокодов. Добавьте первый выше.</div>';
+        } else {
+          listEl.innerHTML = promoCodes.map(p => `
+            <div class="product-card" data-id="${p.id}">
+              <div class="info" style="flex:1;">
+                <div class="title">${(p.code||'').replace(/</g,'&lt;')}</div>
+                <div class="meta">Скидка ${p.discount_percent}% · ${p.is_active ? 'Активен' : 'Неактивен'}</div>
+              </div>
+              <div class="actions">
+                <button type="button" class="btn-edit" data-id="${p.id}" data-action="toggle">${p.is_active ? 'Выключить' : 'Включить'}</button>
+                <button type="button" class="btn-danger" data-id="${p.id}" data-action="delete">Удалить</button>
+              </div>
+            </div>
+          `).join('');
+          listEl.querySelectorAll('.btn-edit[data-action="toggle"]').forEach(btn => {
+            btn.addEventListener('click', () => togglePromo(btn.dataset.id));
+          });
+          listEl.querySelectorAll('.btn-danger[data-action="delete"]').forEach(btn => {
+            btn.addEventListener('click', () => deletePromo(btn.dataset.id));
+          });
+        }
+      } catch (err) {
+        listEl.innerHTML = '<div class="empty">Ошибка или таблица нет. Выполните promo_codes_setup.sql в Supabase.</div>';
+      }
+    }
+
+    async function togglePromo(id) {
+      const p = promoCodes.find(x => x.id === id);
+      if (!p || !supabaseClient || !adminSecret) return;
+      try {
+        const { error } = await supabaseClient.rpc('update_promo_code', {
+          p_id: id,
+          p_code: p.code,
+          p_discount: p.discount_percent,
+          p_is_active: !p.is_active,
+          p_secret: adminSecret
+        });
+        if (error) throw error;
+        showMsg('Промокод обновлён.');
+        loadPromoCodes();
+      } catch (err) {
+        showMsg('Ошибка: ' + (err.message || err) + '. Проверьте adminSecret в config.js', true);
+      }
+    }
+
+    async function deletePromo(id) {
+      if (!supabaseClient || !adminSecret) return;
+      if (!confirm('Удалить промокод?')) return;
+      try {
+        const { error } = await supabaseClient.rpc('delete_promo_code', { p_id: id, p_secret: adminSecret });
+        if (error) throw error;
+        showMsg('Промокод удалён.');
+        loadPromoCodes();
+      } catch (err) {
+        showMsg('Ошибка: ' + (err.message || err), true);
+      }
+    }
+
+    document.getElementById('promoForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!supabaseClient || !adminSecret) {
+        showMsg('Добавьте adminSecret в config.js', true);
+        return;
+      }
+      const btn = document.getElementById('addPromoBtn');
+      btn.disabled = true;
+      try {
+        const code = document.getElementById('promoCode').value.trim().toUpperCase();
+        const discount = parseInt(document.getElementById('promoDiscount').value, 10) || 0;
+        const { error } = await supabaseClient.rpc('add_promo_code', {
+          p_code: code,
+          p_discount: discount,
+          p_secret: adminSecret
+        });
+        if (error) throw error;
+        showMsg('Промокод добавлен.');
+        document.getElementById('promoForm').reset();
+        loadPromoCodes();
+      } catch (err) {
+        showMsg('Ошибка: ' + (err.message || err) + '. Проверьте adminSecret и promo_codes_setup.sql', true);
+      }
+      btn.disabled = false;
+    });
+
+    if (init()) {
+      toggleSizesByCategory();
+      const m = supabaseConfig.url.match(/https:\/\/([^.]+)\.supabase\.co/);
+      if (m) {
+        const link = document.getElementById('projectLink');
+        if (link) link.href = 'https://supabase.com/dashboard/project/' + m[1];
+      }
+      if (checkAuth()) {
+        showMsg('Готово. Добавьте товар или управляйте списком.', false);
+      }
+    }
+  </script>
+</body>
+</html>

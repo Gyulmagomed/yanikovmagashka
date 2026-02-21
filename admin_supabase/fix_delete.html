@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Исправить удаление — YANIKOV</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #050505;
+      color: #fafafa;
+      margin: 0;
+      padding: 24px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 20px; margin-bottom: 8px; }
+    p { color: #a3a3a3; line-height: 1.6; margin-bottom: 20px; }
+    .sql {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+      font-family: monospace;
+      font-size: 14px;
+      white-space: pre-wrap;
+      margin-bottom: 20px;
+      overflow-x: auto;
+    }
+    button {
+      padding: 14px 24px;
+      background: #fff;
+      color: #050505;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-right: 12px;
+      margin-bottom: 12px;
+    }
+    button:hover { opacity: 0.9; }
+    .btn-copy { background: #22c55e; color: #fff; }
+    .btn-open { background: #3b82f6; color: #fff; }
+    .done { color: #22c55e; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Включить удаление товаров</h1>
+  <p>Если удаление не работает — в Supabase нет политики DELETE. Выполните SQL ниже.</p>
+
+  <div class="sql" id="sqlBlock">-- Политика удаления для таблицы products
+DROP POLICY IF EXISTS "Разрешить удаление всем" ON products;
+CREATE POLICY "Разрешить удаление всем"
+  ON products FOR DELETE
+  USING (true);</div>
+
+  <div>
+    <button class="btn-copy" id="copyBtn">1. Копировать SQL</button>
+    <button class="btn-open" id="openBtn">2. Открыть Supabase SQL Editor</button>
+  </div>
+  <p>3. Вставьте (Ctrl+V) и нажмите Run</p>
+  <p class="done" id="done" style="display:none;">✓ SQL скопирован. Вставьте в Supabase и нажмите Run.</p>
+
+  <script src="config.js"></script>
+  <script>
+    const sql = document.getElementById('sqlBlock').textContent;
+    document.getElementById('copyBtn').addEventListener('click', async () => {
+      await navigator.clipboard.writeText(sql);
+      document.getElementById('done').style.display = 'block';
+    });
+    document.getElementById('openBtn').addEventListener('click', () => {
+      let ref = 'irtfzvbisnrbqjsunelo';
+      if (typeof supabaseConfig !== 'undefined' && supabaseConfig.url) {
+        const m = supabaseConfig.url.match(/https:\/\/([^.]+)\.supabase\.co/);
+        if (m) ref = m[1];
+      }
+      window.open('https://supabase.com/dashboard/project/' + ref + '/sql/new', '_blank');
+    });
+  </script>
+</body>
+</html>
